@@ -1,406 +1,1236 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Simulador de Regleta Eléctrica 16A — Schuko</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<style>
-  :root{
-    --bg1:#1b2230; --bg2:#0e1219; --panel:#232c3d; --panel2:#1a2130;
-    --txt:#e8edf5; --muted:#93a1b5; --accent:#ffb02e; --green:#2ecc71;
-    --orange:#ff9f43; --red:#ff4d4d; --socket:#0c0e12;
-  }
-  *{box-sizing:border-box; margin:0; padding:0;}
-  body{
-    font-family:"Segoe UI", Roboto, Arial, sans-serif; color:var(--txt);
-    background:radial-gradient(1200px 600px at 70% -10%, #2a3648 0%, transparent 60%),
-               linear-gradient(160deg, var(--bg1), var(--bg2)) fixed;
-    min-height:100vh; padding:18px;
-  }
-  header{display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; margin-bottom:16px;}
-  header h1{font-size:1.35rem; letter-spacing:.5px;}
-  header h1 small{display:block; font-size:.75rem; color:var(--muted); font-weight:400; margin-top:2px;}
-  .toolbar{display:flex; flex-wrap:wrap; gap:8px; align-items:center;}
-  button, select{
-    background:var(--panel); color:var(--txt); border:1px solid #3a4763; border-radius:10px;
-    padding:8px 14px; font-size:.88rem; cursor:pointer; transition:.15s;
-  }
-  button:hover, select:hover{border-color:var(--accent); transform:translateY(-1px);}
-  button.primary{background:linear-gradient(180deg,#2f3b52,#232c3d); border-color:#4a5b80;}
-  .layout{display:grid; grid-template-columns:300px 1fr 290px; gap:16px; align-items:start;}
-  @media (max-width:1150px){ .layout{grid-template-columns:1fr;} }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simulador de Regleta Eléctrica 16A — Schuko</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+      :root {
+        --bg1: #1b2230;
+        --bg2: #0e1219;
+        --panel: #232c3d;
+        --panel2: #1a2130;
+        --txt: #e8edf5;
+        --muted: #93a1b5;
+        --accent: #ffb02e;
+        --green: #2ecc71;
+        --orange: #ff9f43;
+        --red: #ff4d4d;
+        --socket: #0c0e12;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: "Segoe UI", Roboto, Arial, sans-serif;
+        color: var(--txt);
+        background:
+          radial-gradient(
+            1200px 600px at 70% -10%,
+            #2a3648 0%,
+            transparent 60%
+          ),
+          linear-gradient(160deg, var(--bg1), var(--bg2)) fixed;
+        min-height: 100vh;
+        padding: 18px;
+      }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+      header h1 {
+        font-size: 1.35rem;
+        letter-spacing: 0.5px;
+      }
+      header h1 small {
+        display: block;
+        font-size: 0.75rem;
+        color: var(--muted);
+        font-weight: 400;
+        margin-top: 2px;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      button,
+      select {
+        background: var(--panel);
+        color: var(--txt);
+        border: 1px solid #3a4763;
+        border-radius: 10px;
+        padding: 8px 14px;
+        font-size: 0.88rem;
+        cursor: pointer;
+        transition: 0.15s;
+      }
+      button:hover,
+      select:hover {
+        border-color: var(--accent);
+        transform: translateY(-1px);
+      }
+      button.primary {
+        background: linear-gradient(180deg, #2f3b52, #232c3d);
+        border-color: #4a5b80;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 300px 1fr 290px;
+        gap: 16px;
+        align-items: start;
+      }
+      @media (max-width: 1150px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+      }
 
-  /* ---------- Almacén ---------- */
-  .card{background:var(--panel); border:1px solid #323e56; border-radius:16px; padding:14px; box-shadow:0 8px 24px rgba(0,0,0,.35);}
-  .card h2{font-size:.95rem; margin-bottom:4px;}
-  .card .hint{font-size:.75rem; color:var(--muted); margin-bottom:10px;}
-  #almacen{display:flex; flex-direction:column; gap:10px; max-height:66vh; overflow-y:auto; padding-right:4px;}
-  .aparato{
-    display:flex; gap:10px; align-items:center; background:var(--panel2); border:1px solid #33405c;
-    border-radius:12px; padding:8px; cursor:grab; user-select:none; transition:.15s; position:relative;
-  }
-  .aparato:hover{border-color:var(--accent); box-shadow:0 4px 14px rgba(255,176,46,.15);}
-  .aparato:active{cursor:grabbing;}
-  .aparato img{width:58px; height:58px; object-fit:contain; filter:drop-shadow(0 4px 6px rgba(0,0,0,.5)); pointer-events:none;}
-  .aparato .info{flex:1; min-width:0;}
-  .aparato .nombre{font-size:.85rem; font-weight:600;}
-  .aparato .datos{font-size:.72rem; color:var(--muted);}
-  .aparato .amps{font-size:.95rem; font-weight:700; color:var(--accent); white-space:nowrap;}
-  .aparato .amps.desconocido{color:var(--muted); border:1px dashed #33405c; border-radius:8px; padding:2px 9px; cursor:help;}
-  .aparato .del{position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; background:var(--red);
-    color:#fff; border:none; font-size:.7rem; line-height:1; padding:0; display:none;}
-  .aparato.custom .del{display:block;}
+      /* ---------- Almacén ---------- */
+      .card {
+        background: var(--panel);
+        border: 1px solid #323e56;
+        border-radius: 16px;
+        padding: 14px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      }
+      .card h2 {
+        font-size: 0.95rem;
+        margin-bottom: 4px;
+      }
+      .card .hint {
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-bottom: 10px;
+      }
+      #almacen {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-height: 66vh;
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+      .aparato {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        background: var(--panel2);
+        border: 1px solid #33405c;
+        border-radius: 12px;
+        padding: 8px;
+        cursor: grab;
+        user-select: none;
+        transition: 0.15s;
+        position: relative;
+      }
+      .aparato:hover {
+        border-color: var(--accent);
+        box-shadow: 0 4px 14px rgba(255, 176, 46, 0.15);
+      }
+      .aparato:active {
+        cursor: grabbing;
+      }
+      .aparato img {
+        width: 58px;
+        height: 58px;
+        object-fit: contain;
+        filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5));
+        pointer-events: none;
+      }
+      .aparato .info {
+        flex: 1;
+        min-width: 0;
+      }
+      .aparato .nombre {
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+      .aparato .datos {
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+      .aparato .amps {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--accent);
+        white-space: nowrap;
+      }
+      .aparato .amps.desconocido {
+        color: var(--muted);
+        border: 1px dashed #33405c;
+        border-radius: 8px;
+        padding: 2px 9px;
+        cursor: help;
+      }
+      .aparato .del {
+        position: absolute;
+        top: -6px;
+        right: -6px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--red);
+        color: #fff;
+        border: none;
+        font-size: 0.7rem;
+        line-height: 1;
+        padding: 0;
+        display: none;
+      }
+      .aparato.custom .del {
+        display: block;
+      }
 
-  /* ---------- Escenario (regleta) ---------- */
-  #escenario{position:relative; padding-bottom:8px; overflow:hidden;}
-  .pared{position:absolute; inset:0 0 34% 0; border-radius:16px 16px 0 0;
-    background:linear-gradient(180deg,#39445c 0%, #2b3448 70%, #242c3e 100%);}
-  .suelo{position:absolute; left:0; right:0; bottom:0; height:36%;
-    background:linear-gradient(180deg,#3d3226 0%, #2c241b 100%); border-radius:0 0 16px 16px;}
-  .suelo::before{content:""; position:absolute; inset:0;
-    background:repeating-linear-gradient(90deg, rgba(0,0,0,.18) 0 2px, transparent 2px 90px);}
-  .contenido{position:relative; z-index:2; padding:20px 20px 8px;}
-  #cables{position:absolute; inset:0; z-index:3; pointer-events:none;}
-  #cables path{fill:none; stroke:#14161a; stroke-width:5; stroke-linecap:round;}
-  #fuego{position:absolute; inset:0; z-index:6; pointer-events:none; display:none;}
+      /* ---------- Escenario (regleta) ---------- */
+      #escenario {
+        position: relative;
+        padding-bottom: 8px;
+        overflow: hidden;
+      }
+      .pared {
+        position: absolute;
+        inset: 0 0 34% 0;
+        border-radius: 16px 16px 0 0;
+        background: linear-gradient(
+          180deg,
+          #39445c 0%,
+          #2b3448 70%,
+          #242c3e 100%
+        );
+      }
+      .suelo {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 36%;
+        background: linear-gradient(180deg, #3d3226 0%, #2c241b 100%);
+        border-radius: 0 0 16px 16px;
+      }
+      .suelo::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: repeating-linear-gradient(
+          90deg,
+          rgba(0, 0, 0, 0.18) 0 2px,
+          transparent 2px 90px
+        );
+      }
+      .contenido {
+        position: relative;
+        z-index: 2;
+        padding: 20px 20px 8px;
+      }
+      #cables {
+        position: absolute;
+        inset: 0;
+        z-index: 3;
+        pointer-events: none;
+      }
+      #cables path {
+        fill: none;
+        stroke: #14161a;
+        stroke-width: 5;
+        stroke-linecap: round;
+      }
+      #fuego {
+        position: absolute;
+        inset: 0;
+        z-index: 6;
+        pointer-events: none;
+        display: none;
+      }
 
-  /* ---------- Rescate: basura / comprar nueva ---------- */
-  #overlayRescate{position:absolute; inset:0; z-index:8; background:rgba(8,10,14,.78); display:none;
-    align-items:center; justify-content:center; border-radius:16px;}
-  #overlayRescate.visible{display:flex; animation:fadeInRescate .3s;}
-  @keyframes fadeInRescate{from{opacity:0} to{opacity:1}}
-  .cajaRescate{text-align:center; padding:26px 34px; background:var(--panel); border:1px solid #4a5b80;
-    border-radius:18px; box-shadow:0 12px 40px rgba(0,0,0,.6);}
-  .cajaRescate h3{font-size:1.05rem; margin-bottom:6px;}
-  .cajaRescate p{font-size:.8rem; color:var(--muted); margin-bottom:18px;}
-  .opciones{display:flex; gap:22px; justify-content:center;}
-  .opcion{display:flex; flex-direction:column; align-items:center; gap:8px; background:var(--panel2);
-    border:1px solid #3a4763; border-radius:14px; padding:16px 20px; min-width:130px; cursor:pointer;
-    transition:transform .2s, border-color .2s, box-shadow .2s;}
-  .opcion .ico{font-size:2.6rem; line-height:1;}
-  .opcion .txt{font-size:.78rem;}
-  .opcion:hover:not(:disabled){transform:translateY(-4px) scale(1.05); border-color:var(--accent);
-    box-shadow:0 8px 22px rgba(255,176,46,.25);}
-  .opcion:disabled{opacity:.35; cursor:not-allowed;}
-  .opcion.animada{animation:popInOpcion .5s cubic-bezier(.2,1.5,.4,1) backwards;}
-  @keyframes popInOpcion{from{transform:scale(0) rotate(-14deg);} to{transform:scale(1) rotate(0);}}
-  #regletaWrap.tirando #regleta{animation:tirarBasura 1.1s ease-in forwards;}
-  @keyframes tirarBasura{
-    0%{transform:rotate(0) translateY(0) scale(1); opacity:1;}
-    35%{transform:rotate(18deg) translateY(40px) scale(.92); opacity:1;}
-    70%{transform:rotate(120deg) translateY(220px) scale(.55); opacity:.8;}
-    100%{transform:rotate(200deg) translateY(480px) scale(.2); opacity:0;}
-  }
-  #regletaWrap.nueva #regleta{animation:traerNueva .9s cubic-bezier(.2,1.2,.4,1);}
-  @keyframes traerNueva{
-    0%{transform:translateY(-520px) rotate(-10deg); opacity:0;}
-    55%{transform:translateY(18px) rotate(3deg); opacity:1;}
-    80%{transform:translateY(-8px) rotate(-1deg);}
-    100%{transform:translateY(0) rotate(0);}
-  }
+      /* ---------- Rescate: basura / comprar nueva ---------- */
+      #overlayRescate {
+        position: absolute;
+        inset: 0;
+        z-index: 8;
+        background: rgba(8, 10, 14, 0.78);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        border-radius: 16px;
+      }
+      #overlayRescate.visible {
+        display: flex;
+        animation: fadeInRescate 0.3s;
+      }
+      @keyframes fadeInRescate {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      .cajaRescate {
+        text-align: center;
+        padding: 26px 34px;
+        background: var(--panel);
+        border: 1px solid #4a5b80;
+        border-radius: 18px;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+      }
+      .cajaRescate h3 {
+        font-size: 1.05rem;
+        margin-bottom: 6px;
+      }
+      .cajaRescate p {
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-bottom: 18px;
+      }
+      .opciones {
+        display: flex;
+        gap: 22px;
+        justify-content: center;
+      }
+      .opcion {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        background: var(--panel2);
+        border: 1px solid #3a4763;
+        border-radius: 14px;
+        padding: 16px 20px;
+        min-width: 130px;
+        cursor: pointer;
+        transition:
+          transform 0.2s,
+          border-color 0.2s,
+          box-shadow 0.2s;
+      }
+      .opcion .ico {
+        font-size: 2.6rem;
+        line-height: 1;
+      }
+      .opcion .txt {
+        font-size: 0.78rem;
+      }
+      .opcion:hover:not(:disabled) {
+        transform: translateY(-4px) scale(1.05);
+        border-color: var(--accent);
+        box-shadow: 0 8px 22px rgba(255, 176, 46, 0.25);
+      }
+      .opcion:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+      .opcion.animada {
+        animation: popInOpcion 0.5s cubic-bezier(0.2, 1.5, 0.4, 1) backwards;
+      }
+      @keyframes popInOpcion {
+        from {
+          transform: scale(0) rotate(-14deg);
+        }
+        to {
+          transform: scale(1) rotate(0);
+        }
+      }
+      #regletaWrap.tirando #regleta {
+        animation: tirarBasura 1.1s ease-in forwards;
+      }
+      @keyframes tirarBasura {
+        0% {
+          transform: rotate(0) translateY(0) scale(1);
+          opacity: 1;
+        }
+        35% {
+          transform: rotate(18deg) translateY(40px) scale(0.92);
+          opacity: 1;
+        }
+        70% {
+          transform: rotate(120deg) translateY(220px) scale(0.55);
+          opacity: 0.8;
+        }
+        100% {
+          transform: rotate(200deg) translateY(480px) scale(0.2);
+          opacity: 0;
+        }
+      }
+      #regletaWrap.nueva #regleta {
+        animation: traerNueva 0.9s cubic-bezier(0.2, 1.2, 0.4, 1);
+      }
+      @keyframes traerNueva {
+        0% {
+          transform: translateY(-520px) rotate(-10deg);
+          opacity: 0;
+        }
+        55% {
+          transform: translateY(18px) rotate(3deg);
+          opacity: 1;
+        }
+        80% {
+          transform: translateY(-8px) rotate(-1deg);
+        }
+        100% {
+          transform: translateY(0) rotate(0);
+        }
+      }
 
-  /* Regleta */
-  #regletaWrap{position:relative; margin:6px auto 0; width:fit-content; z-index:4;}
-  #regleta{
-    position:relative; display:flex; align-items:center; gap:26px;
-    padding:22px 30px; border-radius:22px;
-    background:linear-gradient(180deg,#f4f4f6 0%, #d7d7db 45%, #b9b9c0 55%, #cfcfd6 100%);
-    box-shadow:0 14px 30px rgba(0,0,0,.55), inset 0 2px 3px rgba(255,255,255,.9), inset 0 -3px 6px rgba(0,0,0,.25);
-  }
-  #regleta::before{content:""; position:absolute; inset:6px; border-radius:16px; pointer-events:none;
-    background:linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,0) 30%);}
-  #regleta.quemada{filter:brightness(.45) saturate(.4) contrast(1.1);}
-  #regleta.enllamas{animation:temblor .12s infinite;}
-  @keyframes temblor{0%{transform:translate(0,0)}25%{transform:translate(1px,-1px)}50%{transform:translate(-1px,1px)}75%{transform:translate(1px,1px)}100%{transform:translate(0,0)}}
+      /* Regleta */
+      #regletaWrap {
+        position: relative;
+        margin: 6px auto 0;
+        width: fit-content;
+        z-index: 4;
+      }
+      #regleta {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 26px;
+        padding: 22px 30px;
+        border-radius: 22px;
+        background: linear-gradient(
+          180deg,
+          #f4f4f6 0%,
+          #d7d7db 45%,
+          #b9b9c0 55%,
+          #cfcfd6 100%
+        );
+        box-shadow:
+          0 14px 30px rgba(0, 0, 0, 0.55),
+          inset 0 2px 3px rgba(255, 255, 255, 0.9),
+          inset 0 -3px 6px rgba(0, 0, 0, 0.25);
+      }
+      #regleta::before {
+        content: "";
+        position: absolute;
+        inset: 6px;
+        border-radius: 16px;
+        pointer-events: none;
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.5),
+          rgba(255, 255, 255, 0) 30%
+        );
+      }
+      #regleta.quemada {
+        filter: brightness(0.45) saturate(0.4) contrast(1.1);
+      }
+      #regleta.enllamas {
+        animation: temblor 0.12s infinite;
+      }
+      @keyframes temblor {
+        0% {
+          transform: translate(0, 0);
+        }
+        25% {
+          transform: translate(1px, -1px);
+        }
+        50% {
+          transform: translate(-1px, 1px);
+        }
+        75% {
+          transform: translate(1px, 1px);
+        }
+        100% {
+          transform: translate(0, 0);
+        }
+      }
 
-  .etiqueta{font-size:.62rem; color:#55565e; text-align:center; line-height:1.25; letter-spacing:.4px; white-space:nowrap; z-index:2;}
-  .etiqueta b{display:block; font-size:.72rem; color:#33343a;}
-  .led{width:12px; height:12px; border-radius:50%; background:#5c1010; border:1px solid #333;
-    box-shadow:inset 0 1px 2px rgba(0,0,0,.6); z-index:2; transition:.2s;}
-  .led.on{background:radial-gradient(circle at 35% 35%, #ff8f8f, #e60000 60%); box-shadow:0 0 12px 3px rgba(255,40,40,.8);}
+      .etiqueta {
+        font-size: 0.62rem;
+        color: #55565e;
+        text-align: center;
+        line-height: 1.25;
+        letter-spacing: 0.4px;
+        white-space: nowrap;
+        z-index: 2;
+      }
+      .etiqueta b {
+        display: block;
+        font-size: 0.72rem;
+        color: #33343a;
+      }
+      .led {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #5c1010;
+        border: 1px solid #333;
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+        z-index: 2;
+        transition: 0.2s;
+      }
+      .led.on {
+        background: radial-gradient(circle at 35% 35%, #ff8f8f, #e60000 60%);
+        box-shadow: 0 0 12px 3px rgba(255, 40, 40, 0.8);
+      }
 
-  /* Interruptor basculante */
-  #interruptor{width:46px; height:74px; border-radius:10px; z-index:2; cursor:pointer; position:relative;
-    background:linear-gradient(180deg,#c9c9cf,#a9a9b1); border:1px solid #8a8a92;
-    box-shadow:inset 0 2px 4px rgba(0,0,0,.35), 0 2px 4px rgba(0,0,0,.3);}
-  #interruptor .rocker{position:absolute; inset:5px; border-radius:7px; transition:.12s;
-    background:linear-gradient(180deg,#8f1f1f 0%, #c62b2b 50%, #a02020 100%);
-    box-shadow:0 3px 6px rgba(0,0,0,.5), inset 0 1px 2px rgba(255,255,255,.35);}
-  #interruptor.on .rocker{transform:perspective(120px) rotateX(16deg);
-    background:linear-gradient(180deg,#1d7a3f 0%, #2ecc71 50%, #1f8f4a 100%);
-    box-shadow:0 -2px 5px rgba(0,0,0,.45), inset 0 1px 2px rgba(255,255,255,.4);}
-  #interruptor .marca{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-    color:rgba(255,255,255,.85); font-weight:800; font-size:.72rem; z-index:3; pointer-events:none; text-shadow:0 1px 2px rgba(0,0,0,.6);}
-  #intTag{font-size:.6rem; color:#55565e; text-align:center; margin-top:5px; letter-spacing:.5px;}
+      /* Interruptor basculante */
+      #interruptor {
+        width: 46px;
+        height: 74px;
+        border-radius: 10px;
+        z-index: 2;
+        cursor: pointer;
+        position: relative;
+        background: linear-gradient(180deg, #c9c9cf, #a9a9b1);
+        border: 1px solid #8a8a92;
+        box-shadow:
+          inset 0 2px 4px rgba(0, 0, 0, 0.35),
+          0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+      #interruptor .rocker {
+        position: absolute;
+        inset: 5px;
+        border-radius: 7px;
+        transition: 0.12s;
+        background: linear-gradient(
+          180deg,
+          #8f1f1f 0%,
+          #c62b2b 50%,
+          #a02020 100%
+        );
+        box-shadow:
+          0 3px 6px rgba(0, 0, 0, 0.5),
+          inset 0 1px 2px rgba(255, 255, 255, 0.35);
+      }
+      #interruptor.on .rocker {
+        transform: perspective(120px) rotateX(16deg);
+        background: linear-gradient(
+          180deg,
+          #1d7a3f 0%,
+          #2ecc71 50%,
+          #1f8f4a 100%
+        );
+        box-shadow:
+          0 -2px 5px rgba(0, 0, 0, 0.45),
+          inset 0 1px 2px rgba(255, 255, 255, 0.4);
+      }
+      #interruptor .marca {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        color: rgba(255, 255, 255, 0.85);
+        font-weight: 800;
+        font-size: 0.72rem;
+        z-index: 3;
+        pointer-events: none;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+      }
+      #intTag {
+        font-size: 0.6rem;
+        color: #55565e;
+        text-align: center;
+        margin-top: 5px;
+        letter-spacing: 0.5px;
+      }
 
-  /* Tomas schuko */
-  .toma{position:relative; width:86px; height:86px; cursor:pointer; z-index:2; transition:.15s;}
-  .toma svg{width:100%; height:100%; filter:drop-shadow(0 3px 4px rgba(0,0,0,.35)); pointer-events:none;}
-  .toma::after{content:attr(data-idx); position:absolute; bottom:-16px; left:50%; transform:translateX(-50%);
-    font-size:.62rem; color:#6a6b74;}
-  .toma.ocupada{cursor:pointer;}
-  .toma.hover{border-radius:50%; outline:3px dashed var(--accent); outline-offset:4px;}
-  .toma .enchufe{position:absolute; inset:0; display:none; z-index:3; pointer-events:none;}
-  .toma.ocupada .enchufe{display:block; animation:clavija .25s ease;}
-  @keyframes clavija{from{transform:translateY(-14px); opacity:0} to{transform:translateY(0); opacity:1}}
-  .toma .miniA{position:absolute; top:-18px; left:50%; transform:translateX(-50%); font-size:.66rem; font-weight:700;
-    color:#fff; background:#c0392b; border-radius:8px; padding:1px 7px; white-space:nowrap; display:none; z-index:4;}
-  .toma.ocupada .miniA{display:block;}
+      /* Tomas schuko */
+      .toma {
+        position: relative;
+        width: 86px;
+        height: 86px;
+        cursor: pointer;
+        z-index: 2;
+        transition: 0.15s;
+      }
+      .toma svg {
+        width: 100%;
+        height: 100%;
+        filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.35));
+        pointer-events: none;
+      }
+      .toma::after {
+        content: attr(data-idx);
+        position: absolute;
+        bottom: -16px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.62rem;
+        color: #6a6b74;
+      }
+      .toma.ocupada {
+        cursor: pointer;
+      }
+      .toma.hover {
+        border-radius: 50%;
+        outline: 3px dashed var(--accent);
+        outline-offset: 4px;
+      }
+      .toma .enchufe {
+        position: absolute;
+        inset: 0;
+        display: none;
+        z-index: 3;
+        pointer-events: none;
+      }
+      .toma.ocupada .enchufe {
+        display: block;
+        animation: clavija 0.25s ease;
+      }
+      @keyframes clavija {
+        from {
+          transform: translateY(-14px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+      .toma .miniA {
+        position: absolute;
+        top: -18px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.66rem;
+        font-weight: 700;
+        color: #fff;
+        background: #c0392b;
+        border-radius: 8px;
+        padding: 1px 7px;
+        white-space: nowrap;
+        display: none;
+        z-index: 4;
+      }
+      .toma.ocupada .miniA {
+        display: block;
+      }
 
-  /* Zona de aparatos conectados (suelo) */
-  #conectados{position:relative; z-index:5; display:flex; flex-wrap:wrap; gap:14px; justify-content:center; margin-top:26px; min-height:150px; padding:6px 0 12px;}
-  .conectado{background:rgba(20,25,36,.88); border:1px solid #3a4763; border-radius:14px; padding:10px 12px; width:150px;
-    text-align:center; position:relative; backdrop-filter:blur(2px); animation:aparecer .3s ease;}
-  @keyframes aparecer{from{transform:scale(.7); opacity:0} to{transform:scale(1); opacity:1}}
-  .conectado img{width:86px; height:86px; object-fit:contain; filter:drop-shadow(0 6px 8px rgba(0,0,0,.6));}
-  .conectado .nombre{font-size:.78rem; font-weight:600; margin-top:4px;}
-  .conectado .datos{font-size:.7rem; color:var(--muted);}
-  .conectado .amps{font-size:.9rem; font-weight:800; color:var(--accent); margin:2px 0 6px;}
-  .conectado button{font-size:.68rem; padding:4px 10px;}
-  .conectado.trabajando img{filter:drop-shadow(0 0 10px rgba(46,204,113,.75));}
-  .conectado.fuego img{animation:temblor .12s infinite; filter:drop-shadow(0 0 12px rgba(255,80,0,.9)) brightness(1.1);}
+      /* Zona de aparatos conectados (suelo) */
+      #conectados {
+        position: relative;
+        z-index: 5;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        justify-content: center;
+        margin-top: 26px;
+        min-height: 150px;
+        padding: 6px 0 12px;
+      }
+      .conectado {
+        background: rgba(20, 25, 36, 0.88);
+        border: 1px solid #3a4763;
+        border-radius: 14px;
+        padding: 10px 12px;
+        width: 150px;
+        text-align: center;
+        position: relative;
+        backdrop-filter: blur(2px);
+        animation: aparecer 0.3s ease;
+      }
+      @keyframes aparecer {
+        from {
+          transform: scale(0.7);
+          opacity: 0;
+        }
+        to {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      .conectado img {
+        width: 86px;
+        height: 86px;
+        object-fit: contain;
+        filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.6));
+      }
+      .conectado .nombre {
+        font-size: 0.78rem;
+        font-weight: 600;
+        margin-top: 4px;
+      }
+      .conectado .datos {
+        font-size: 0.7rem;
+        color: var(--muted);
+      }
+      .conectado .amps {
+        font-size: 0.9rem;
+        font-weight: 800;
+        color: var(--accent);
+        margin: 2px 0 6px;
+      }
+      .conectado button {
+        font-size: 0.68rem;
+        padding: 4px 10px;
+      }
+      .conectado.trabajando img {
+        filter: drop-shadow(0 0 10px rgba(46, 204, 113, 0.75));
+      }
+      .conectado.fuego img {
+        animation: temblor 0.12s infinite;
+        filter: drop-shadow(0 0 12px rgba(255, 80, 0, 0.9)) brightness(1.1);
+      }
 
-  /* ---------- Panel derecho ---------- */
-  #panelStatus .estado{font-size:1.02rem; font-weight:700; text-align:center; padding:12px; border-radius:12px; margin-top:10px; line-height:1.35;}
-  .st-off{background:#2a3244; color:var(--muted);}
-  .st-ok{background:rgba(46,204,113,.14); color:var(--green); border:1px solid rgba(46,204,113,.4);}
-  .st-warn{background:rgba(255,159,67,.14); color:var(--orange); border:1px solid rgba(255,159,67,.4);}
-  .st-fire{background:rgba(255,77,77,.18); color:var(--red); border:1px solid rgba(255,77,77,.55); animation:parpadeo .5s infinite alternate;}
-  @keyframes parpadeo{from{box-shadow:0 0 6px rgba(255,77,77,.3)} to{box-shadow:0 0 22px rgba(255,77,77,.8)}}
-  .gauge{margin-top:14px;}
-  .gauge .cifra{font-size:2.2rem; font-weight:800; text-align:center;}
-  .gauge .cifra span{font-size:.85rem; color:var(--muted); font-weight:400;}
-  .barra{height:22px; border-radius:12px; background:#141922; border:1px solid #33405c; overflow:hidden; margin-top:8px; position:relative;}
-  .barra .fill{height:100%; width:0%; border-radius:12px; transition:width .4s, background .4s;
-    background:linear-gradient(90deg,#27ae60,#2ecc71);}
-  .barra .limite{position:absolute; top:-3px; bottom:-3px; left:100%; width:2px; background:var(--red);}
-  .barra .marca16{position:absolute; right:4px; top:50%; transform:translateY(-50%); font-size:.6rem; color:#ffb3b3; z-index:2;}
-  .listaConsumos{margin-top:14px; font-size:.78rem;}
-  .listaConsumos div{display:flex; justify-content:space-between; padding:4px 2px; border-bottom:1px dashed #33405c;}
-  .listaConsumos div b{color:var(--accent);}
-  .listaConsumos .vacio{color:var(--muted); text-align:center; border:none;}
+      /* ---------- Panel derecho ---------- */
+      #panelStatus .estado {
+        font-size: 1.02rem;
+        font-weight: 700;
+        text-align: center;
+        padding: 12px;
+        border-radius: 12px;
+        margin-top: 10px;
+        line-height: 1.35;
+      }
+      .st-off {
+        background: #2a3244;
+        color: var(--muted);
+      }
+      .st-ok {
+        background: rgba(46, 204, 113, 0.14);
+        color: var(--green);
+        border: 1px solid rgba(46, 204, 113, 0.4);
+      }
+      .st-warn {
+        background: rgba(255, 159, 67, 0.14);
+        color: var(--orange);
+        border: 1px solid rgba(255, 159, 67, 0.4);
+      }
+      .st-fire {
+        background: rgba(255, 77, 77, 0.18);
+        color: var(--red);
+        border: 1px solid rgba(255, 77, 77, 0.55);
+        animation: parpadeo 0.5s infinite alternate;
+      }
+      @keyframes parpadeo {
+        from {
+          box-shadow: 0 0 6px rgba(255, 77, 77, 0.3);
+        }
+        to {
+          box-shadow: 0 0 22px rgba(255, 77, 77, 0.8);
+        }
+      }
+      .gauge {
+        margin-top: 14px;
+      }
+      .gauge .cifra {
+        font-size: 2.2rem;
+        font-weight: 800;
+        text-align: center;
+      }
+      .gauge .cifra span {
+        font-size: 0.85rem;
+        color: var(--muted);
+        font-weight: 400;
+      }
+      .barra {
+        height: 22px;
+        border-radius: 12px;
+        background: #141922;
+        border: 1px solid #33405c;
+        overflow: hidden;
+        margin-top: 8px;
+        position: relative;
+      }
+      .barra .fill {
+        height: 100%;
+        width: 0%;
+        border-radius: 12px;
+        transition:
+          width 0.4s,
+          background 0.4s;
+        background: linear-gradient(90deg, #27ae60, #2ecc71);
+      }
+      .barra .limite {
+        position: absolute;
+        top: -3px;
+        bottom: -3px;
+        left: 100%;
+        width: 2px;
+        background: var(--red);
+      }
+      .barra .marca16 {
+        position: absolute;
+        right: 4px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 0.6rem;
+        color: #ffb3b3;
+        z-index: 2;
+      }
+      .listaConsumos {
+        margin-top: 14px;
+        font-size: 0.78rem;
+      }
+      .listaConsumos div {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 2px;
+        border-bottom: 1px dashed #33405c;
+      }
+      .listaConsumos div b {
+        color: var(--accent);
+      }
+      .listaConsumos .vacio {
+        color: var(--muted);
+        text-align: center;
+        border: none;
+      }
 
-  /* ---------- Formulario nuevo aparato ---------- */
-  #formAparato{display:none;}
-  #formAparato label{display:block; font-size:.74rem; color:var(--muted); margin:8px 0 3px;}
-  #formAparato input, #formAparato textarea{width:100%; background:var(--panel2); border:1px solid #33405c; color:var(--txt);
-    border-radius:8px; padding:7px 9px; font-size:.85rem;}
-  #formAparato input:focus, #formAparato textarea:focus{outline:none; border-color:var(--accent);}
-  .previewFoto{width:90px; height:90px; object-fit:contain; background:#141922; border-radius:10px; border:1px dashed #33405c; margin-top:6px;}
-  .msg{font-size:.75rem; margin-top:8px; min-height:1em;}
-  .msg.ok{color:var(--green);} .msg.err{color:var(--red);}
-</style>
-</head>
-<body>
+      /* ---------- Formulario nuevo aparato ---------- */
+      #formAparato {
+        display: none;
+      }
+      #formAparato label {
+        display: block;
+        font-size: 0.74rem;
+        color: var(--muted);
+        margin: 8px 0 3px;
+      }
+      #formAparato input,
+      #formAparato textarea {
+        width: 100%;
+        background: var(--panel2);
+        border: 1px solid #33405c;
+        color: var(--txt);
+        border-radius: 8px;
+        padding: 7px 9px;
+        font-size: 0.85rem;
+      }
+      #formAparato input:focus,
+      #formAparato textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+      .previewFoto {
+        width: 90px;
+        height: 90px;
+        object-fit: contain;
+        background: #141922;
+        border-radius: 10px;
+        border: 1px dashed #33405c;
+        margin-top: 6px;
+      }
+      .msg {
+        font-size: 0.75rem;
+        margin-top: 8px;
+        min-height: 1em;
+      }
+      .msg.ok {
+        color: var(--green);
+      }
+      .msg.err {
+        color: var(--red);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>
+        🔌 Simulador de Regleta Eléctrica 16A
+        <small
+          >Arrastra electrodomésticos a las tomas Schuko y comprueba la suma de
+          intensidades (máx. 16 A)</small
+        >
+      </h1>
+      <div class="toolbar">
+        <label style="font-size: 0.8rem; color: var(--muted)"
+          >Tomas:
+          <select id="selTomas">
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4" selected>4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+          </select>
+        </label>
+        <button class="primary" id="btnAdd">＋ Añadir electrodoméstico</button>
+        <button id="btnExport">⬇ Exportar (ZIP)</button>
+        <button id="btnImport">⬆ Importar</button>
+        <input type="file" id="fileImport" accept=".zip" hidden />
+      </div>
+    </header>
 
-<header>
-  <h1>🔌 Simulador de Regleta Eléctrica 16A
-    <small>Arrastra electrodomésticos a las tomas Schuko y comprueba la suma de intensidades (máx. 16 A)</small>
-  </h1>
-  <div class="toolbar">
-    <label style="font-size:.8rem; color:var(--muted)">Tomas:
-      <select id="selTomas">
-        <option value="2">2</option><option value="3">3</option>
-        <option value="4" selected>4</option><option value="5">5</option><option value="6">6</option>
-      </select>
-    </label>
-    <button class="primary" id="btnAdd">＋ Añadir electrodoméstico</button>
-    <button id="btnExport">⬇ Exportar (ZIP)</button>
-    <button id="btnImport">⬆ Importar</button>
-    <input type="file" id="fileImport" accept=".zip" hidden>
-  </div>
-</header>
+    <div class="layout">
+      <!-- ALMACÉN -->
+      <section class="card">
+        <h2>🏠 Almacén de aparatos</h2>
+        <p class="hint">
+          Arrastra un aparato a una toma de la regleta (o haz doble clic para
+          enchufarlo automáticamente).
+        </p>
+        <div id="almacen"></div>
+      </section>
 
-<div class="layout">
-
-  <!-- ALMACÉN -->
-  <section class="card">
-    <h2>🏠 Almacén de aparatos</h2>
-    <p class="hint">Arrastra un aparato a una toma de la regleta (o haz doble clic para enchufarlo automáticamente).</p>
-    <div id="almacen"></div>
-  </section>
-
-  <!-- ESCENARIO -->
-  <section class="card" id="escenario">
-    <div class="pared"></div>
-    <div class="suelo"></div>
-    <div class="contenido">
-      <div id="regletaWrap">
-        <div id="regleta">
-          <div class="etiqueta"><b>POWER LINE</b>SCHUKO 16A · 250V~<br>máx. 3680 W</div>
-          <div class="led" id="led"></div>
-          <div id="zonaTomas" style="display:flex; gap:26px; align-items:center; z-index:2;"></div>
-          <div>
-            <div id="interruptor" role="switch" aria-checked="false" tabindex="0" title="Interruptor general">
-              <div class="rocker"></div><div class="marca">I/O</div>
+      <!-- ESCENARIO -->
+      <section class="card" id="escenario">
+        <div class="pared"></div>
+        <div class="suelo"></div>
+        <div class="contenido">
+          <div id="regletaWrap">
+            <div id="regleta">
+              <div class="etiqueta">
+                <b>POWER LINE</b>SCHUKO 16A · 250V~<br />máx. 3680 W
+              </div>
+              <div class="led" id="led"></div>
+              <div
+                id="zonaTomas"
+                style="
+                  display: flex;
+                  gap: 26px;
+                  align-items: center;
+                  z-index: 2;
+                "
+              ></div>
+              <div>
+                <div
+                  id="interruptor"
+                  role="switch"
+                  aria-checked="false"
+                  tabindex="0"
+                  title="Interruptor general"
+                >
+                  <div class="rocker"></div>
+                  <div class="marca">I/O</div>
+                </div>
+                <div id="intTag">INTERRUPTOR</div>
+              </div>
             </div>
-            <div id="intTag">INTERRUPTOR</div>
+          </div>
+          <div id="conectados"></div>
+        </div>
+        <svg id="cables"></svg>
+        <canvas id="fuego"></canvas>
+        <div id="overlayRescate">
+          <div class="cajaRescate">
+            <h3>💥 La regleta ha quedado inservible</h3>
+            <p>Tira la regleta quemada y hazte con una nueva.</p>
+            <div class="opciones">
+              <button id="btnBasura" class="opcion">
+                <span class="ico">🗑️</span
+                ><span class="txt">Tirar a la basura</span>
+              </button>
+              <button id="btnComprar" class="opcion" disabled>
+                <span class="ico">🛒</span
+                ><span class="txt">Comprar nueva</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-      <div id="conectados"></div>
-    </div>
-    <svg id="cables"></svg>
-    <canvas id="fuego"></canvas>
-    <div id="overlayRescate">
-      <div class="cajaRescate">
-        <h3>💥 La regleta ha quedado inservible</h3>
-        <p>Tira la regleta quemada y hazte con una nueva.</p>
-        <div class="opciones">
-          <button id="btnBasura" class="opcion">
-            <span class="ico">🗑️</span><span class="txt">Tirar a la basura</span>
-          </button>
-          <button id="btnComprar" class="opcion" disabled>
-            <span class="ico">🛒</span><span class="txt">Comprar nueva</span>
-          </button>
+      </section>
+
+      <!-- PANEL -->
+      <aside style="display: flex; flex-direction: column; gap: 16px">
+        <div class="card" id="panelStatus">
+          <h2>⚡ Consumo total</h2>
+          <div class="gauge">
+            <div class="cifra">
+              <span id="totalA">0,00</span> <span>A / 16 A máx.</span>
+            </div>
+            <div class="barra">
+              <div class="fill" id="fillBar"></div>
+              <span class="marca16">16A</span>
+            </div>
+          </div>
+          <div class="estado st-off" id="estado">
+            Regleta apagada. Enchufa aparatos y pulsa el interruptor.
+          </div>
+          <div class="listaConsumos" id="listaConsumos">
+            <div class="vacio">Ningún aparato enchufado</div>
+          </div>
         </div>
-      </div>
-    </div>
-  </section>
 
-  <!-- PANEL -->
-  <aside style="display:flex; flex-direction:column; gap:16px;">
-    <div class="card" id="panelStatus">
-      <h2>⚡ Consumo total</h2>
-      <div class="gauge">
-        <div class="cifra"><span id="totalA">0,00</span> <span>A / 16 A máx.</span></div>
-        <div class="barra">
-          <div class="fill" id="fillBar"></div>
-          <span class="marca16">16A</span>
+        <div class="card" id="formAparato">
+          <h2>＋ Nuevo electrodoméstico</h2>
+          <form id="formNuevo">
+            <label>Nombre *</label
+            ><input
+              id="fNombre"
+              required
+              maxlength="40"
+              placeholder="p. ej. Horno eléctrico"
+            />
+            <label>Intensidad (amperios) *</label
+            ><input
+              id="fAmps"
+              type="number"
+              step="0.1"
+              min="0.1"
+              max="40"
+              required
+              placeholder="p. ej. 8,5"
+            />
+            <label>Potencia (vatios, opcional)</label
+            ><input
+              id="fWatts"
+              type="number"
+              step="1"
+              min="0"
+              placeholder="p. ej. 2000"
+            />
+            <label>Descripción (opcional)</label
+            ><textarea
+              id="fDesc"
+              rows="2"
+              maxlength="120"
+              placeholder="Características eléctricas…"
+            ></textarea>
+            <label>Fotografía</label
+            ><input id="fFoto" type="file" accept="image/*" />
+            <img
+              class="previewFoto"
+              id="previewFoto"
+              alt=""
+              style="display: none"
+            />
+            <div style="display: flex; gap: 8px; margin-top: 12px">
+              <button type="submit" class="primary">Guardar</button>
+              <button type="button" id="btnCancelForm">Cancelar</button>
+            </div>
+            <div class="msg" id="msgForm"></div>
+          </form>
         </div>
-      </div>
-      <div class="estado st-off" id="estado">Regleta apagada. Enchufa aparatos y pulsa el interruptor.</div>
-      <div class="listaConsumos" id="listaConsumos"><div class="vacio">Ningún aparato enchufado</div></div>
+      </aside>
     </div>
 
-    <div class="card" id="formAparato">
-      <h2>＋ Nuevo electrodoméstico</h2>
-      <form id="formNuevo">
-        <label>Nombre *</label><input id="fNombre" required maxlength="40" placeholder="p. ej. Horno eléctrico">
-        <label>Intensidad (amperios) *</label><input id="fAmps" type="number" step="0.1" min="0.1" max="40" required placeholder="p. ej. 8,5">
-        <label>Potencia (vatios, opcional)</label><input id="fWatts" type="number" step="1" min="0" placeholder="p. ej. 2000">
-        <label>Descripción (opcional)</label><textarea id="fDesc" rows="2" maxlength="120" placeholder="Características eléctricas…"></textarea>
-        <label>Fotografía</label><input id="fFoto" type="file" accept="image/*">
-        <img class="previewFoto" id="previewFoto" alt="" style="display:none;">
-        <div style="display:flex; gap:8px; margin-top:12px;">
-          <button type="submit" class="primary">Guardar</button>
-          <button type="button" id="btnCancelForm">Cancelar</button>
-        </div>
-        <div class="msg" id="msgForm"></div>
-      </form>
-    </div>
-  </aside>
-</div>
+    <script>
+      "use strict";
+      /* =================== DATOS =================== */
+      const MAX_A = 16;
+      const PREDEFINIDOS = [
+        {
+          id: "pc",
+          nombre: "Ordenador de sobremesa",
+          amperios: 2.6,
+          vatios: 600,
+          descripcion: "Torre + monitor",
+          imagen: "images/ordenador.png",
+          builtin: true,
+        },
+        {
+          id: "calefactor",
+          nombre: "Calefactor",
+          amperios: 12.2,
+          vatios: 2800,
+          descripcion: "Resistencia + ventilador",
+          imagen: "images/calefactor.png",
+          builtin: true,
+        },
+        {
+          id: "radiador",
+          nombre: "Radiador de aceite",
+          amperios: 8.7,
+          vatios: 2000,
+          descripcion: "9 elementos",
+          imagen: "images/radiador.png",
+          builtin: true,
+        },
+        {
+          id: "microondas",
+          nombre: "Microondas",
+          amperios: 5.2,
+          vatios: 1200,
+          descripcion: "Inox, 20 L",
+          imagen: "images/microondas.png",
+          builtin: true,
+        },
+        {
+          id: "frigo",
+          nombre: "Frigorífico",
+          amperios: 1.1,
+          vatios: 250,
+          descripcion: "Comb. inox, clase F",
+          imagen: "images/frigorifico.png",
+          builtin: true,
+        },
+        {
+          id: "tv",
+          nombre: "Televisor",
+          amperios: 1.3,
+          vatios: 300,
+          descripcion: 'LED 55"',
+          imagen: "images/televisor.png",
+          builtin: true,
+        },
+        {
+          id: "lavadora",
+          nombre: "Lavadora",
+          amperios: 4.3,
+          vatios: 1000,
+          descripcion: "Carga frontal 8 kg",
+          imagen: "images/lavadora.png",
+          builtin: true,
+        },
+        {
+          id: "freidora",
+          nombre: "Freidora de aire",
+          amperios: 6.5,
+          vatios: 1500,
+          descripcion: "5,5 L digital",
+          imagen: "images/freidora.png",
+          builtin: true,
+        },
+        {
+          id: "impresora",
+          nombre: "Impresora",
+          amperios: 0.6,
+          vatios: 130,
+          descripcion: "Inyección de tinta",
+          imagen: "images/impresora.png",
+          builtin: true,
+        },
+        {
+          id: "cargador",
+          nombre: "Cargador de móvil",
+          amperios: 0.1,
+          vatios: 20,
+          descripcion: "USB 5V",
+          imagen: "images/cargador.png",
+          builtin: true,
+        },
+        {
+          id: "lavavajillas",
+          nombre: "Lavavajillas",
+          amperios: 4.8,
+          vatios: 1100,
+          descripcion: "60 cm, 13 cubiertos",
+          imagen: "images/lavavajillas.png",
+          builtin: true,
+        },
+        {
+          id: "horno",
+          nombre: "Horno eléctrico",
+          amperios: 10.9,
+          vatios: 2500,
+          descripcion: "Multifunción pirolítico",
+          imagen: "images/horno.png",
+          builtin: true,
+        },
+        {
+          id: "vitro",
+          nombre: "Vitrocerámica de inducción",
+          amperios: 13.0,
+          vatios: 3000,
+          descripcion: "4 zonas táctiles",
+          imagen: "images/vitro.png",
+          builtin: true,
+        },
+      ];
 
-<script>
-"use strict";
-/* =================== DATOS =================== */
-const MAX_A = 16;
-const PREDEFINIDOS = [
-  {id:"pc",      nombre:"Ordenador de sobremesa", amperios:2.6,  vatios:600,  descripcion:"Torre + monitor",       imagen:"images/ordenador.png", builtin:true},
-  {id:"calefactor", nombre:"Calefactor",          amperios:12.2, vatios:2800, descripcion:"Resistencia + ventilador", imagen:"images/calefactor.png", builtin:true},
-  {id:"radiador",nombre:"Radiador de aceite",     amperios:8.7,  vatios:2000, descripcion:"9 elementos",           imagen:"images/radiador.png",  builtin:true},
-  {id:"microondas", nombre:"Microondas",          amperios:5.2,  vatios:1200, descripcion:"Inox, 20 L",            imagen:"images/microondas.png",builtin:true},
-  {id:"frigo",   nombre:"Frigorífico",            amperios:1.1,  vatios:250,  descripcion:"Comb. inox, clase F",   imagen:"images/frigorifico.png",builtin:true},
-  {id:"tv",      nombre:"Televisor",              amperios:1.3,  vatios:300,  descripcion:"LED 55\"",             imagen:"images/televisor.png", builtin:true},
-  {id:"lavadora",nombre:"Lavadora",               amperios:4.3,  vatios:1000, descripcion:"Carga frontal 8 kg",    imagen:"images/lavadora.png",  builtin:true},
-  {id:"freidora",nombre:"Freidora de aire",       amperios:6.5,  vatios:1500, descripcion:"5,5 L digital",         imagen:"images/freidora.png",  builtin:true},
-  {id:"impresora", nombre:"Impresora",           amperios:0.6,  vatios:130,  descripcion:"Inyección de tinta",    imagen:"images/impresora.png", builtin:true},
-  {id:"cargador", nombre:"Cargador de móvil",    amperios:0.1,  vatios:20,   descripcion:"USB 5V",                imagen:"images/cargador.png",  builtin:true},
-  {id:"lavavajillas", nombre:"Lavavajillas",     amperios:4.8,  vatios:1100, descripcion:"60 cm, 13 cubiertos",   imagen:"images/lavavajillas.png", builtin:true},
-  {id:"horno",   nombre:"Horno eléctrico",        amperios:10.9, vatios:2500, descripcion:"Multifunción pirolítico", imagen:"images/horno.png",   builtin:true},
-  {id:"vitro",   nombre:"Vitrocerámica de inducción", amperios:13.0, vatios:3000, descripcion:"4 zonas táctiles",     imagen:"images/vitro.png",     builtin:true},
-];
+      let state = {
+        numTomas: 4,
+        switchOn: false,
+        quemada: false,
+        plugs: {}, // {tomaIdx: aparatoId}
+        appliances: JSON.parse(JSON.stringify(PREDEFINIDOS)),
+      };
 
-let state = {
-  numTomas: 4,
-  switchOn: false,
-  quemada: false,
-  plugs: {},           // {tomaIdx: aparatoId}
-  appliances: JSON.parse(JSON.stringify(PREDEFINIDOS)),
-};
+      /* =================== INDEXEDDB =================== */
+      const DB = {
+        abrir() {
+          return new Promise((res, rej) => {
+            const r = indexedDB.open("regletaDB", 1);
+            r.onupgradeneeded = (e) =>
+              e.target.result.createObjectStore("datos");
+            r.onsuccess = (e) => res(e.target.result);
+            r.onerror = () => rej(r.error);
+          });
+        },
+        async guardar(clave, valor) {
+          const db = await this.abrir();
+          return new Promise((res, rej) => {
+            const tx = db.transaction("datos", "readwrite");
+            tx.objectStore("datos").put(valor, clave);
+            tx.oncomplete = () => res();
+            tx.onerror = () => rej(tx.error);
+          });
+        },
+        async cargar(clave) {
+          const db = await this.abrir();
+          return new Promise((res, rej) => {
+            const rq = db.transaction("datos").objectStore("datos").get(clave);
+            rq.onsuccess = () => res(rq.result);
+            rq.onerror = () => rej(rq.error);
+          });
+        },
+      };
 
-/* =================== INDEXEDDB =================== */
-const DB = {
-  abrir(){ return new Promise((res, rej)=>{
-    const r = indexedDB.open("regletaDB", 1);
-    r.onupgradeneeded = e => e.target.result.createObjectStore("datos");
-    r.onsuccess = e => res(e.target.result);
-    r.onerror = () => rej(r.error);
-  });},
-  async guardar(clave, valor){
-    const db = await this.abrir();
-    return new Promise((res, rej)=>{
-      const tx = db.transaction("datos","readwrite");
-      tx.objectStore("datos").put(valor, clave);
-      tx.oncomplete = ()=>res(); tx.onerror = ()=>rej(tx.error);
-    });
-  },
-  async cargar(clave){
-    const db = await this.abrir();
-    return new Promise((res, rej)=>{
-      const rq = db.transaction("datos").objectStore("datos").get(clave);
-      rq.onsuccess = ()=>res(rq.result); rq.onerror = ()=>rej(rq.error);
-    });
-  }
-};
+      /* =================== UTILIDADES =================== */
+      const $ = (s) => document.querySelector(s);
+      const fmt = (n) => n.toFixed(2).replace(".", ",");
+      const aparatoPorId = (id) => state.appliances.find((a) => a.id === id);
+      function uid() {
+        return (
+          "a" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
+        );
+      }
 
-/* =================== UTILIDADES =================== */
-const $ = s => document.querySelector(s);
-const fmt = n => n.toFixed(2).replace(".", ",");
-const aparatoPorId = id => state.appliances.find(a=>a.id===id);
-function uid(){ return "a" + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+      function totalAmperios() {
+        return Object.values(state.plugs).reduce((s, id) => {
+          const a = aparatoPorId(id);
+          return a ? s + a.amperios : s;
+        }, 0);
+      }
 
-function totalAmperios(){
-  return Object.values(state.plugs).reduce((s,id)=>{ const a=aparatoPorId(id); return a? s+a.amperios : s; },0);
-}
+      /* Redimensionar foto a dataURL pequeño */
+      function procesarFoto(file) {
+        return new Promise((res, rej) => {
+          const img = new Image();
+          img.onload = () => {
+            const MAX = 480;
+            let { width: w, height: h } = img;
+            const esc = Math.min(1, MAX / Math.max(w, h));
+            w = Math.round(w * esc);
+            h = Math.round(h * esc);
+            const cv = document.createElement("canvas");
+            cv.width = w;
+            cv.height = h;
+            cv.getContext("2d").drawImage(img, 0, 0, w, h);
+            URL.revokeObjectURL(img.src);
+            res(cv.toDataURL("image/png"));
+          };
+          img.onerror = rej;
+          img.src = URL.createObjectURL(file);
+        });
+      }
 
-/* Redimensionar foto a dataURL pequeño */
-function procesarFoto(file){
-  return new Promise((res, rej)=>{
-    const img = new Image();
-    img.onload = ()=>{
-      const MAX = 480;
-      let {width:w, height:h} = img;
-      const esc = Math.min(1, MAX/Math.max(w,h));
-      w = Math.round(w*esc); h = Math.round(h*esc);
-      const cv = document.createElement("canvas"); cv.width=w; cv.height=h;
-      cv.getContext("2d").drawImage(img, 0, 0, w, h);
-      URL.revokeObjectURL(img.src);
-      res(cv.toDataURL("image/png"));
-    };
-    img.onerror = rej;
-    img.src = URL.createObjectURL(file);
-  });
-}
+      /* Resolver imagen a dataURL: dataURL directa, fetch (http) o canvas */
+      async function imagenADataURL(aparato) {
+        if (!aparato.imagen) return null;
+        if (aparato.imagen.startsWith("data:")) return aparato.imagen;
+        try {
+          const r = await fetch(aparato.imagen);
+          if (!r.ok) throw 0;
+          const b = await r.blob();
+          return await new Promise((res) => {
+            const fr = new FileReader();
+            fr.onload = () => res(fr.result);
+            fr.readAsDataURL(b);
+          });
+        } catch (e) {
+          try {
+            return await new Promise((res, rej) => {
+              const img = new Image();
+              img.onload = () => {
+                const cv = document.createElement("canvas");
+                cv.width = img.naturalWidth;
+                cv.height = img.naturalHeight;
+                cv.getContext("2d").drawImage(img, 0, 0);
+                try {
+                  res(cv.toDataURL("image/png"));
+                } catch (err) {
+                  rej(err);
+                }
+              };
+              img.onerror = rej;
+              img.src = aparato.imagen;
+            });
+          } catch (e2) {
+            return null;
+          }
+        }
+      }
 
-/* Resolver imagen a dataURL: dataURL directa, fetch (http) o canvas */
-async function imagenADataURL(aparato){
-  if(!aparato.imagen) return null;
-  if(aparato.imagen.startsWith("data:")) return aparato.imagen;
-  try{
-    const r = await fetch(aparato.imagen);
-    if(!r.ok) throw 0;
-    const b = await r.blob();
-    return await new Promise(res=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.readAsDataURL(b); });
-  }catch(e){
-    try{
-      return await new Promise((res, rej)=>{
-        const img = new Image();
-        img.onload = ()=>{
-          const cv = document.createElement("canvas"); cv.width=img.naturalWidth; cv.height=img.naturalHeight;
-          cv.getContext("2d").drawImage(img,0,0);
-          try{ res(cv.toDataURL("image/png")); }catch(err){ rej(err); }
-        };
-        img.onerror = rej; img.src = aparato.imagen;
-      });
-    }catch(e2){ return null; }
-  }
-}
-
-/* =================== RENDER =================== */
-const TOMA_SVG = `
+      /* =================== RENDER =================== */
+      const TOMA_SVG = `
 <svg viewBox="0 0 100 100">
   <defs>
     <radialGradient id="gRec" cx="50%" cy="42%" r="60%">
@@ -418,420 +1248,613 @@ const TOMA_SVG = `
   <ellipse cx="34" cy="28" rx="16" ry="7" fill="rgba(255,255,255,.07)"/>
 </svg>`;
 
-const CLAVIJA_SVG = `
+      const CLAVIJA_SVG = `
 <svg class="enchufe" viewBox="0 0 100 100">
-  <rect x="26" y="6" width="48" height="34" rx="8" fill="#ececf0" stroke="#9a9aa2" stroke-width="2"/>
-  <rect x="34" y="12" width="5" height="16" rx="2" fill="#c9c9cf"/><rect x="61" y="12" width="5" height="16" rx="2" fill="#c9c9cf"/>
-  <path d="M 50 40 L 50 66" stroke="#14161a" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="50" cy="50" r="38" style="fill:url(#_Radial1);"/>
+  <g transform="matrix(2.428571,0,0,7.302351,-71.428571,-3.703702)">
+    <path d="M55.353,2C56.262,2 57,2.245 57,2.548L57,13.452C57,13.755 56.262,14 55.353,14L44.647,14C43.738,14 43,13.755 43,13.452L43,2.548C43,2.245 43.738,2 44.647,2L55.353,2Z" style="fill:rgb(20,22,26);"/>
+  </g>
+  <defs>
+    <radialGradient id="_Radial1" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(49.4,0,0,49.4,50,42.4)"><stop offset="0" style="stop-color:rgb(23,24,28);stop-opacity:1"/><stop offset="1" style="stop-color:rgb(5,6,8);stop-opacity:1"/></radialGradient>
+  </defs>
 </svg>`;
 
-function renderAlmacen(){
-  const cont = $("#almacen"); cont.innerHTML = "";
-  const usados = new Set(Object.values(state.plugs));
-  state.appliances.forEach(a=>{
-    const div = document.createElement("div");
-    div.className = "aparato" + (a.builtin ? "" : " custom");
-    div.draggable = true;
-    div.dataset.id = a.id;
-    div.innerHTML = `
-      <img src="${a.imagen||""}" alt="${a.nombre}" onerror="this.style.visibility='hidden'">
+      function renderAlmacen() {
+        const cont = $("#almacen");
+        cont.innerHTML = "";
+        const usados = new Set(Object.values(state.plugs));
+        state.appliances.forEach((a) => {
+          const div = document.createElement("div");
+          div.className = "aparato" + (a.builtin ? "" : " custom");
+          div.draggable = true;
+          div.dataset.id = a.id;
+          div.innerHTML = `
+      <img src="${a.imagen || ""}" alt="${a.nombre}" onerror="this.style.visibility='hidden'">
       <div class="info">
         <div class="nombre">${a.nombre}</div>
-        <div class="datos">${a.descripcion||""}</div>
+        <div class="datos">${a.descripcion || ""}</div>
       </div>
       <div class="amps desconocido" title="La intensidad se descubrirá al enchufarlo">? A</div>
-      ${a.builtin? "" : `<button class="del" title="Eliminar">✕</button>`}`;
-    div.addEventListener("dragstart", e=>{
-      e.dataTransfer.setData("text/plain", a.id);
-      e.dataTransfer.effectAllowed = "copy";
-    });
-    div.addEventListener("dblclick", ()=>{
-      const libre = primeraTomaLibre();
-      if(libre===null){ aviso("Todas las tomas están ocupadas."); return; }
-      enchufar(libre, a.id);
-    });
-    const del = div.querySelector(".del");
-    if(del) del.addEventListener("click", e=>{
-      e.stopPropagation();
-      if(usados.has(a.id)){ aviso("Desenchufa primero este aparato."); return; }
-      state.appliances = state.appliances.filter(x=>x.id!==a.id);
-      guardarYRender();
-    });
-    cont.appendChild(div);
-  });
-}
+      ${a.builtin ? "" : `<button class="del" title="Eliminar">✕</button>`}`;
+          div.addEventListener("dragstart", (e) => {
+            e.dataTransfer.setData("text/plain", a.id);
+            e.dataTransfer.effectAllowed = "copy";
+          });
+          div.addEventListener("dblclick", () => {
+            const libre = primeraTomaLibre();
+            if (libre === null) {
+              aviso("Todas las tomas están ocupadas.");
+              return;
+            }
+            enchufar(libre, a.id);
+          });
+          const del = div.querySelector(".del");
+          if (del)
+            del.addEventListener("click", (e) => {
+              e.stopPropagation();
+              if (usados.has(a.id)) {
+                aviso("Desenchufa primero este aparato.");
+                return;
+              }
+              state.appliances = state.appliances.filter((x) => x.id !== a.id);
+              guardarYRender();
+            });
+          cont.appendChild(div);
+        });
+      }
 
-function primeraTomaLibre(){
-  for(let i=0;i<state.numTomas;i++) if(!state.plugs[i]) return i;
-  return null;
-}
+      function primeraTomaLibre() {
+        for (let i = 0; i < state.numTomas; i++) if (!state.plugs[i]) return i;
+        return null;
+      }
 
-function renderRegleta(){
-  const zona = $("#zonaTomas"); zona.innerHTML = "";
-  for(let i=0;i<state.numTomas;i++){
-    const t = document.createElement("div");
-    t.className = "toma" + (state.plugs[i] ? " ocupada" : "");
-    t.dataset.idx = i;
-    t.innerHTML = TOMA_SVG + CLAVIJA_SVG;
-    const a = aparatoPorId(state.plugs[i]);
-    if(a){
-      const m = document.createElement("div"); m.className="miniA"; m.textContent = fmt(a.amperios)+" A";
-      t.appendChild(m);
-    }
-    t.addEventListener("dragover", e=>{ e.preventDefault(); t.classList.add("hover"); });
-    t.addEventListener("dragleave", ()=>t.classList.remove("hover"));
-    t.addEventListener("drop", e=>{
-      e.preventDefault(); t.classList.remove("hover");
-      const id = e.dataTransfer.getData("text/plain");
-      if(aparatoPorId(id)) enchufar(i, id);
-    });
-    t.addEventListener("click", ()=>{ if(state.plugs[i]) desenchufar(i); });
-    zona.appendChild(t);
-  }
-  $("#regleta").classList.toggle("quemada", state.quemada);
-  $("#regleta").classList.toggle("enllamas", state.switchOn && totalAmperios() > MAX_A);
-  $("#led").classList.toggle("on", state.switchOn);
-  $("#interruptor").classList.toggle("on", state.switchOn);
-  $("#interruptor").setAttribute("aria-checked", state.switchOn);
-}
+      function renderRegleta() {
+        const zona = $("#zonaTomas");
+        zona.innerHTML = "";
+        for (let i = 0; i < state.numTomas; i++) {
+          const t = document.createElement("div");
+          t.className = "toma" + (state.plugs[i] ? " ocupada" : "");
+          t.dataset.idx = i;
+          t.innerHTML = TOMA_SVG + CLAVIJA_SVG;
+          const a = aparatoPorId(state.plugs[i]);
+          if (a) {
+            const m = document.createElement("div");
+            m.className = "miniA";
+            m.textContent = fmt(a.amperios) + " A";
+            t.appendChild(m);
+          }
+          t.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            t.classList.add("hover");
+          });
+          t.addEventListener("dragleave", () => t.classList.remove("hover"));
+          t.addEventListener("drop", (e) => {
+            e.preventDefault();
+            t.classList.remove("hover");
+            const id = e.dataTransfer.getData("text/plain");
+            if (aparatoPorId(id)) enchufar(i, id);
+          });
+          t.addEventListener("click", () => {
+            if (state.plugs[i]) desenchufar(i);
+          });
+          zona.appendChild(t);
+        }
+        $("#regleta").classList.toggle("quemada", state.quemada);
+        $("#regleta").classList.toggle(
+          "enllamas",
+          state.switchOn && totalAmperios() > MAX_A,
+        );
+        $("#led").classList.toggle("on", state.switchOn);
+        $("#interruptor").classList.toggle("on", state.switchOn);
+        $("#interruptor").setAttribute("aria-checked", state.switchOn);
+      }
 
-function renderConectados(){
-  const cont = $("#conectados"); cont.innerHTML = "";
-  const sobrecarga = state.switchOn && totalAmperios() > MAX_A;
-  Object.entries(state.plugs).forEach(([i,id])=>{
-    const a = aparatoPorId(id); if(!a) return;
-    const div = document.createElement("div");
-    div.className = "conectado" + (state.switchOn && !sobrecarga ? " trabajando" : "") + (sobrecarga ? " fuego" : "");
-    div.dataset.toma = i;
-    div.innerHTML = `
-      <img src="${a.imagen||""}" alt="${a.nombre}" onerror="this.style.visibility='hidden'">
+      function renderConectados() {
+        const cont = $("#conectados");
+        cont.innerHTML = "";
+        const sobrecarga = state.switchOn && totalAmperios() > MAX_A;
+        Object.entries(state.plugs).forEach(([i, id]) => {
+          const a = aparatoPorId(id);
+          if (!a) return;
+          const div = document.createElement("div");
+          div.className =
+            "conectado" +
+            (state.switchOn && !sobrecarga ? " trabajando" : "") +
+            (sobrecarga ? " fuego" : "");
+          div.dataset.toma = i;
+          div.innerHTML = `
+      <img src="${a.imagen || ""}" alt="${a.nombre}" onerror="this.style.visibility='hidden'">
       <div class="nombre">${a.nombre}</div>
-      <div class="datos">Toma ${+i+1}${a.vatios? " · "+a.vatios+" W":""}</div>
+      <div class="datos">Toma ${+i + 1}${a.vatios ? " · " + a.vatios + " W" : ""}</div>
       <div class="amps">${fmt(a.amperios)} A</div>
       <button data-i="${i}">Desenchufar</button>`;
-    div.querySelector("button").addEventListener("click", ()=>desenchufar(+i));
-    cont.appendChild(div);
-  });
-  requestAnimationFrame(dibujarCables);
-}
-
-function renderPanel(){
-  const total = totalAmperios();
-  $("#totalA").textContent = fmt(total);
-  const fill = $("#fillBar");
-  fill.style.width = Math.min(100, total/MAX_A*100) + "%";
-  fill.style.background = total > MAX_A
-    ? "linear-gradient(90deg,#c0392b,#ff4d4d)"
-    : total > MAX_A*0.8
-      ? "linear-gradient(90deg,#d68910,#ff9f43)"
-      : "linear-gradient(90deg,#27ae60,#2ecc71)";
-  const est = $("#estado");
-  if(state.quemada){
-    est.className = "estado st-warn";
-    est.textContent = "🔥 La regleta está chamuscada e inservible. Tírala a la basura y compra una nueva.";
-  } else if(state.switchOn && total > MAX_A){
-    est.className = "estado st-fire";
-    est.textContent = "🔥 ¡SOBRECARGA! Superados los 16 A (" + fmt(total) + " A). La regleta se está incendiando…";
-  } else if(state.switchOn){
-    est.className = "estado st-ok";
-    est.textContent = "✅ Funciona con normalidad. Consumo: " + fmt(total) + " A de 16 A (" + Math.round(total/MAX_A*100) + "%).";
-  } else if(total > MAX_A){
-    est.className = "estado st-warn";
-    est.textContent = "⚠️ ¡Sobrecarga! La suma (" + fmt(total) + " A) supera los 16 A. No enciendas la regleta.";
-  } else {
-    est.className = "estado st-off";
-    est.textContent = "Regleta apagada. Enchufa aparatos y pulsa el interruptor.";
-  }
-  const lista = $("#listaConsumos"); lista.innerHTML = "";
-  const entradas = Object.entries(state.plugs);
-  if(!entradas.length){ lista.innerHTML = '<div class="vacio">Ningún aparato enchufado</div>'; return; }
-  entradas.forEach(([i,id])=>{
-    const a = aparatoPorId(id); if(!a) return;
-    const d = document.createElement("div");
-    d.innerHTML = `<span>Toma ${+i+1} — ${a.nombre}</span><b>${fmt(a.amperios)} A</b>`;
-    lista.appendChild(d);
-  });
-  const tot = document.createElement("div");
-  tot.innerHTML = `<span><b>Total</b></span><b>${fmt(totalAmperios())} A</b>`;
-  lista.appendChild(tot);
-}
-
-function dibujarCables(){
-  const esc = $("#escenario"), svg = $("#cables");
-  const er = esc.getBoundingClientRect();
-  svg.setAttribute("width", er.width); svg.setAttribute("height", er.height);
-  svg.innerHTML = "";
-  document.querySelectorAll("#zonaTomas .toma").forEach(toma=>{
-    const i = toma.dataset.idx;
-    const card = document.querySelector(`.conectado[data-toma="${i}"]`);
-    if(!card) return;
-    const tr = toma.getBoundingClientRect(), cr = card.getBoundingClientRect();
-    const x1 = tr.left + tr.width/2 - er.left, y1 = tr.top + tr.height - er.top;
-    const x2 = cr.left + cr.width/2 - er.left, y2 = cr.top + 6 - er.top;
-    const p = document.createElementNS("http://www.w3.org/2000/svg","path");
-    const mx = (x1+x2)/2;
-    p.setAttribute("d", `M ${x1} ${y1} C ${mx} ${y1+70}, ${mx} ${y2-70}, ${x2} ${y2}`);
-    svg.appendChild(p);
-  });
-}
-
-function renderTodo(){ renderAlmacen(); renderRegleta(); renderConectados(); renderPanel(); }
-async function guardarYRender(){ renderTodo(); try{ await DB.guardar("state", JSON.parse(JSON.stringify(state))); }catch(e){} }
-
-/* =================== ACCIONES =================== */
-function enchufar(i, id){
-  if(state.quemada){ aviso("La regleta está chamuscada e inservible: tírala a la basura y compra una nueva."); return; }
-  state.plugs[i] = id;
-  guardarYRender();
-}
-function desenchufar(i){
-  delete state.plugs[i];
-  guardarYRender();
-}
-let msgTimer;
-function aviso(txt){
-  const est = $("#estado");
-  est.dataset.prev = est.textContent;
-  est.textContent = "ℹ️ " + txt;
-  clearTimeout(msgTimer);
-  msgTimer = setTimeout(renderPanel, 1800);
-}
-
-/* Interruptor */
-$("#interruptor").addEventListener("click", toggleInterruptor);
-$("#interruptor").addEventListener("keydown", e=>{ if(e.key===" "||e.key==="Enter"){ e.preventDefault(); toggleInterruptor(); }});
-function toggleInterruptor(){
-  if(state.quemada){ aviso("La regleta está chamuscada e inservible: tírala a la basura y compra una nueva."); return; }
-  state.switchOn = !state.switchOn;
-  if(state.switchOn && totalAmperios() > MAX_A) iniciarIncendio();
-  else detenerFuego();
-  guardarYRender();
-}
-
-/* Nº de tomas */
-$("#selTomas").addEventListener("change", e=>{
-  state.numTomas = +e.target.value;
-  Object.keys(state.plugs).forEach(k=>{ if(+k >= state.numTomas) delete state.plugs[k]; });
-  guardarYRender();
-});
-
-/* =================== FUEGO =================== */
-let rafFuego = null;
-function iniciarIncendio(){
-  const cv = $("#fuego"), esc = $("#escenario");
-  cv.style.display = "block";
-  cv.width = esc.clientWidth; cv.height = esc.clientHeight;
-  const ctx = cv.getContext("2d");
-  const reg = $("#regleta").getBoundingClientRect(), er = esc.getBoundingClientRect();
-  const baseX = reg.left - er.left + reg.width/2, baseY = reg.top - er.top + reg.height*0.55;
-  const parts = [];
-  function spawn(n){
-    for(let k=0;k<n;k++) parts.push({
-      x: baseX + (Math.random()-0.5)*reg.width*0.85,
-      y: baseY + (Math.random()-0.5)*30,
-      vx:(Math.random()-0.5)*0.8, vy:-(1.2+Math.random()*2.2),
-      r: 8+Math.random()*20, vida:1, dec:0.008+Math.random()*0.014,
-      humo: Math.random()<0.35
-    });
-  }
-  cancelAnimationFrame(rafFuego);
-  (function loop(){
-    ctx.clearRect(0,0,cv.width,cv.height);
-    spawn(4);
-    for(let i=parts.length-1;i>=0;i--){
-      const p = parts[i];
-      p.x+=p.vx; p.y+=p.vy; p.vy -= p.humo? -0.015 : 0.02; p.vida-=p.dec;
-      if(p.vida<=0){ parts.splice(i,1); continue; }
-      const g = ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r);
-      if(p.humo){
-        g.addColorStop(0, `rgba(90,90,95,${0.35*p.vida})`);
-        g.addColorStop(1, "rgba(60,60,65,0)");
-      }else{
-        g.addColorStop(0, `rgba(255,230,120,${0.85*p.vida})`);
-        g.addColorStop(0.4, `rgba(255,120,20,${0.6*p.vida})`);
-        g.addColorStop(1, "rgba(200,30,0,0)");
+          div
+            .querySelector("button")
+            .addEventListener("click", () => desenchufar(+i));
+          cont.appendChild(div);
+        });
+        requestAnimationFrame(dibujarCables);
       }
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
-    }
-    if(state.switchOn) rafFuego = requestAnimationFrame(loop);
-  })();
-  /* El interruptor salta a los 4 s y la regleta queda quemada */
-  setTimeout(()=>{
-    if(totalAmperios() > MAX_A){
-      state.switchOn = false; state.quemada = true;
-      detenerFuego(); guardarYRender();
-      mostrarRescate();
-    }
-  }, 4000);
-}
-function detenerFuego(){
-  cancelAnimationFrame(rafFuego); rafFuego = null;
-  $("#fuego").style.display = "none";
-}
 
-/* ---------- Rescate: tirar a la basura y comprar nueva ---------- */
-let rescateActivo = false;
-function mostrarRescate(){
-  rescateActivo = true;
-  const ov = $("#overlayRescate");
-  ov.classList.add("visible");
-  const b1 = $("#btnBasura"), b2 = $("#btnComprar");
-  b1.disabled = false; b2.disabled = true;
-  b1.classList.remove("animada"); b2.classList.remove("animada");
-  void b1.offsetWidth;               /* reinicia la animación de aparición */
-  b1.classList.add("animada");
-  setTimeout(()=>{ if(rescateActivo) b2.classList.add("animada"); }, 200);
-}
-function ocultarRescate(){
-  rescateActivo = false;
-  $("#overlayRescate").classList.remove("visible");
-}
-$("#btnBasura").addEventListener("click", ()=>{
-  if(!rescateActivo) return;
-  const wrap = $("#regletaWrap");
-  $("#btnBasura").disabled = true;
-  state.plugs = {};                 /* se desenchufan todos los aparatos */
-  guardarYRender();
-  wrap.classList.add("tirando");          /* la regleta cae girando y desaparece */
-  setTimeout(()=>{
-    wrap.style.visibility = "hidden";
-    const b2 = $("#btnComprar");          /* ahora sí se puede comprar la nueva */
-    b2.disabled = false;
-    b2.classList.remove("animada"); void b2.offsetWidth;
-    b2.classList.add("animada");
-  }, 1100);
-});
-$("#btnComprar").addEventListener("click", ()=>{
-  if(!rescateActivo || $("#btnComprar").disabled) return;
-  const wrap = $("#regletaWrap");
-  wrap.classList.remove("tirando");
-  wrap.style.visibility = "";
-  wrap.classList.add("nueva");            /* la regleta nueva entra cayendo del cielo */
-  state.quemada = false; state.switchOn = false;
-  ocultarRescate();
-  guardarYRender();
-  setTimeout(()=>wrap.classList.remove("nueva"), 1000);
-});
-
-/* =================== FORMULARIO NUEVO APARATO =================== */
-let fotoData = null;
-$("#btnAdd").addEventListener("click", ()=>{ $("#formAparato").style.display = "block"; $("#fNombre").focus(); });
-$("#btnCancelForm").addEventListener("click", ()=>{ $("#formAparato").style.display = "none"; });
-$("#fFoto").addEventListener("change", async e=>{
-  const f = e.target.files[0]; if(!f) return;
-  try{
-    fotoData = await procesarFoto(f);
-    const pv = $("#previewFoto"); pv.src = fotoData; pv.style.display = "block";
-  }catch(err){ msgForm("No se pudo leer la imagen.", true); }
-});
-$("#formNuevo").addEventListener("submit", async e=>{
-  e.preventDefault();
-  const nombre = $("#fNombre").value.trim();
-  const amps = parseFloat($("#fAmps").value.replace(",", "."));
-  const watts = parseFloat($("#fWatts").value) || 0;
-  const desc = $("#fDesc").value.trim();
-  if(!nombre || !(amps>0)){ msgForm("Nombre e intensidad son obligatorios.", true); return; }
-  state.appliances.push({ id: uid(), nombre, amperios: amps, vatios: watts, descripcion: desc, imagen: fotoData, builtin: false });
-  e.target.reset(); fotoData = null; $("#previewFoto").style.display = "none";
-  msgForm("Aparato guardado.", false);
-  await guardarYRender();
-  setTimeout(()=>{ $("#formAparato").style.display = "none"; msgForm(""); }, 900);
-});
-function msgForm(txt, err){
-  const m = $("#msgForm"); m.textContent = txt; m.className = "msg " + (err?"err":"ok");
-}
-
-/* =================== EXPORTAR / IMPORTAR ZIP =================== */
-$("#btnExport").addEventListener("click", exportarZIP);
-$("#btnImport").addEventListener("click", ()=>$("#fileImport").click());
-$("#fileImport").addEventListener("change", importarZIP);
-
-async function exportarZIP(){
-  if(typeof JSZip === "undefined"){ alert("JSZip no se ha podido cargar (¿sin conexión?). La exportación necesita la librería CDN."); return; }
-  const zip = new JSZip();
-  const carpeta = zip.folder("images");
-  const faltan = [];
-  const manifest = { version:1, exportado: new Date().toISOString(), numTomas: state.numTomas, plugs: state.plugs, appliances: [] };
-  for(const a of state.appliances){
-    let fichero = a.imagen;
-    if(a.imagen && !a.imagen.startsWith("data:")){
-      const durl = await imagenADataURL(a);
-      if(durl){
-        fichero = a.id + ".png";
-        carpeta.file(fichero, durl.split(",")[1], {base64:true});
-      }else{
-        faltan.push(a.imagen); /* se mantiene la ruta relativa en el JSON */
+      function renderPanel() {
+        const total = totalAmperios();
+        $("#totalA").textContent = fmt(total);
+        const fill = $("#fillBar");
+        fill.style.width = Math.min(100, (total / MAX_A) * 100) + "%";
+        fill.style.background =
+          total > MAX_A
+            ? "linear-gradient(90deg,#c0392b,#ff4d4d)"
+            : total > MAX_A * 0.8
+              ? "linear-gradient(90deg,#d68910,#ff9f43)"
+              : "linear-gradient(90deg,#27ae60,#2ecc71)";
+        const est = $("#estado");
+        if (state.quemada) {
+          est.className = "estado st-warn";
+          est.textContent =
+            "🔥 La regleta está chamuscada e inservible. Tírala a la basura y compra una nueva.";
+        } else if (state.switchOn && total > MAX_A) {
+          est.className = "estado st-fire";
+          est.textContent =
+            "🔥 ¡SOBRECARGA! Superados los 16 A (" +
+            fmt(total) +
+            " A). La regleta se está incendiando…";
+        } else if (state.switchOn) {
+          est.className = "estado st-ok";
+          est.textContent =
+            "✅ Funciona con normalidad. Consumo: " +
+            fmt(total) +
+            " A de 16 A (" +
+            Math.round((total / MAX_A) * 100) +
+            "%).";
+        } else if (total > MAX_A) {
+          est.className = "estado st-warn";
+          est.textContent =
+            "⚠️ ¡Sobrecarga! La suma (" +
+            fmt(total) +
+            " A) supera los 16 A. No enciendas la regleta.";
+        } else {
+          est.className = "estado st-off";
+          est.textContent =
+            "Regleta apagada. Enchufa aparatos y pulsa el interruptor.";
+        }
+        const lista = $("#listaConsumos");
+        lista.innerHTML = "";
+        const entradas = Object.entries(state.plugs);
+        if (!entradas.length) {
+          lista.innerHTML = '<div class="vacio">Ningún aparato enchufado</div>';
+          return;
+        }
+        entradas.forEach(([i, id]) => {
+          const a = aparatoPorId(id);
+          if (!a) return;
+          const d = document.createElement("div");
+          d.innerHTML = `<span>Toma ${+i + 1} — ${a.nombre}</span><b>${fmt(a.amperios)} A</b>`;
+          lista.appendChild(d);
+        });
+        const tot = document.createElement("div");
+        tot.innerHTML = `<span><b>Total</b></span><b>${fmt(totalAmperios())} A</b>`;
+        lista.appendChild(tot);
       }
-    }else if(a.imagen){
-      fichero = a.id + ".png";
-      carpeta.file(fichero, a.imagen.split(",")[1], {base64:true});
-    }
-    manifest.appliances.push({ id:a.id, nombre:a.nombre, amperios:a.amperios, vatios:a.vatios,
-      descripcion:a.descripcion, imagen:fichero, builtin:!!a.builtin });
-  }
-  zip.file("data.json", JSON.stringify(manifest, null, 2));
-  if(faltan.length) zip.file("IMAGENES_NO_INCLUIDAS.txt",
-    "No se pudieron incrustar estas imágenes (abre la página desde un servidor local para incluirlas):\n" + faltan.join("\n"));
-  const blob = await zip.generateAsync({type:"blob", compression:"DEFLATE"});
-  const enlace = document.createElement("a");
-  enlace.href = URL.createObjectURL(blob);
-  enlace.download = "regleta_datos.zip";
-  enlace.click();
-  setTimeout(()=>URL.revokeObjectURL(enlace.href), 4000);
-}
 
-async function importarZIP(e){
-  const f = e.target.files[0]; if(!f) return;
-  e.target.value = "";
-  if(typeof JSZip === "undefined"){ alert("JSZip no se ha podido cargar (¿sin conexión?)."); return; }
-  try{
-    const zip = await JSZip.loadAsync(f);
-    const dataFile = zip.file("data.json");
-    if(!dataFile) throw new Error("El ZIP no contiene data.json");
-    const manifest = JSON.parse(await dataFile.async("string"));
-    const nuevos = [];
-    for(const a of (manifest.appliances || [])){
-      let imagen = a.imagen || null;
-      if(imagen && !imagen.startsWith("data:")){
-        const imgFile = zip.file("images/" + imagen.split("/").pop());
-        if(imgFile){
-          const b64 = await imgFile.async("base64");
-          imagen = "data:image/png;base64," + b64;
+      function dibujarCables() {
+        const esc = $("#escenario"),
+          svg = $("#cables");
+        const er = esc.getBoundingClientRect();
+        svg.setAttribute("width", er.width);
+        svg.setAttribute("height", er.height);
+        svg.innerHTML = "";
+        document.querySelectorAll("#zonaTomas .toma").forEach((toma) => {
+          const i = toma.dataset.idx;
+          const card = document.querySelector(`.conectado[data-toma="${i}"]`);
+          if (!card) return;
+          const tr = toma.getBoundingClientRect(),
+            cr = card.getBoundingClientRect();
+          const x1 = tr.left + tr.width / 2 - er.left,
+            y1 = tr.top + tr.height - er.top;
+          const x2 = cr.left + cr.width / 2 - er.left,
+            y2 = cr.top - er.top;
+          const p = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "path",
+          );
+          const mx = (x1 + x2) / 2;
+          p.setAttribute(
+            "d",
+            `M ${x1} ${y1} C ${mx} ${y1 + 70}, ${mx} ${y2 - 70}, ${x2} ${y2}`,
+          );
+          svg.appendChild(p);
+        });
+      }
+
+      function renderTodo() {
+        renderAlmacen();
+        renderRegleta();
+        renderConectados();
+        renderPanel();
+      }
+      async function guardarYRender() {
+        renderTodo();
+        try {
+          await DB.guardar("state", JSON.parse(JSON.stringify(state)));
+        } catch (e) {}
+      }
+
+      /* =================== ACCIONES =================== */
+      function enchufar(i, id) {
+        if (state.quemada) {
+          aviso(
+            "La regleta está chamuscada e inservible: tírala a la basura y compra una nueva.",
+          );
+          return;
+        }
+        state.plugs[i] = id;
+        guardarYRender();
+      }
+      function desenchufar(i) {
+        delete state.plugs[i];
+        guardarYRender();
+      }
+      let msgTimer;
+      function aviso(txt) {
+        const est = $("#estado");
+        est.dataset.prev = est.textContent;
+        est.textContent = "ℹ️ " + txt;
+        clearTimeout(msgTimer);
+        msgTimer = setTimeout(renderPanel, 1800);
+      }
+
+      /* Interruptor */
+      $("#interruptor").addEventListener("click", toggleInterruptor);
+      $("#interruptor").addEventListener("keydown", (e) => {
+        if (e.key === " " || e.key === "Enter") {
+          e.preventDefault();
+          toggleInterruptor();
+        }
+      });
+      function toggleInterruptor() {
+        if (state.quemada) {
+          aviso(
+            "La regleta está chamuscada e inservible: tírala a la basura y compra una nueva.",
+          );
+          return;
+        }
+        state.switchOn = !state.switchOn;
+        if (state.switchOn && totalAmperios() > MAX_A) iniciarIncendio();
+        else detenerFuego();
+        guardarYRender();
+      }
+
+      /* Nº de tomas */
+      $("#selTomas").addEventListener("change", (e) => {
+        state.numTomas = +e.target.value;
+        Object.keys(state.plugs).forEach((k) => {
+          if (+k >= state.numTomas) delete state.plugs[k];
+        });
+        guardarYRender();
+      });
+
+      /* =================== FUEGO =================== */
+      let rafFuego = null;
+      function iniciarIncendio() {
+        const cv = $("#fuego"),
+          esc = $("#escenario");
+        cv.style.display = "block";
+        cv.width = esc.clientWidth;
+        cv.height = esc.clientHeight;
+        const ctx = cv.getContext("2d");
+        const reg = $("#regleta").getBoundingClientRect(),
+          er = esc.getBoundingClientRect();
+        const baseX = reg.left - er.left + reg.width / 2,
+          baseY = reg.top - er.top + reg.height * 0.55;
+        const parts = [];
+        function spawn(n) {
+          for (let k = 0; k < n; k++)
+            parts.push({
+              x: baseX + (Math.random() - 0.5) * reg.width * 0.85,
+              y: baseY + (Math.random() - 0.5) * 30,
+              vx: (Math.random() - 0.5) * 0.8,
+              vy: -(1.2 + Math.random() * 2.2),
+              r: 8 + Math.random() * 20,
+              vida: 1,
+              dec: 0.008 + Math.random() * 0.014,
+              humo: Math.random() < 0.35,
+            });
+        }
+        cancelAnimationFrame(rafFuego);
+        (function loop() {
+          ctx.clearRect(0, 0, cv.width, cv.height);
+          spawn(4);
+          for (let i = parts.length - 1; i >= 0; i--) {
+            const p = parts[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy -= p.humo ? -0.015 : 0.02;
+            p.vida -= p.dec;
+            if (p.vida <= 0) {
+              parts.splice(i, 1);
+              continue;
+            }
+            const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+            if (p.humo) {
+              g.addColorStop(0, `rgba(90,90,95,${0.35 * p.vida})`);
+              g.addColorStop(1, "rgba(60,60,65,0)");
+            } else {
+              g.addColorStop(0, `rgba(255,230,120,${0.85 * p.vida})`);
+              g.addColorStop(0.4, `rgba(255,120,20,${0.6 * p.vida})`);
+              g.addColorStop(1, "rgba(200,30,0,0)");
+            }
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          if (state.switchOn) rafFuego = requestAnimationFrame(loop);
+        })();
+        /* El interruptor salta a los 4 s y la regleta queda quemada */
+        setTimeout(() => {
+          if (totalAmperios() > MAX_A) {
+            state.switchOn = false;
+            state.quemada = true;
+            detenerFuego();
+            guardarYRender();
+            mostrarRescate();
+          }
+        }, 4000);
+      }
+      function detenerFuego() {
+        cancelAnimationFrame(rafFuego);
+        rafFuego = null;
+        $("#fuego").style.display = "none";
+      }
+
+      /* ---------- Rescate: tirar a la basura y comprar nueva ---------- */
+      let rescateActivo = false;
+      function mostrarRescate() {
+        rescateActivo = true;
+        const ov = $("#overlayRescate");
+        ov.classList.add("visible");
+        const b1 = $("#btnBasura"),
+          b2 = $("#btnComprar");
+        b1.disabled = false;
+        b2.disabled = true;
+        b1.classList.remove("animada");
+        b2.classList.remove("animada");
+        void b1.offsetWidth; /* reinicia la animación de aparición */
+        b1.classList.add("animada");
+        setTimeout(() => {
+          if (rescateActivo) b2.classList.add("animada");
+        }, 200);
+      }
+      function ocultarRescate() {
+        rescateActivo = false;
+        $("#overlayRescate").classList.remove("visible");
+      }
+      $("#btnBasura").addEventListener("click", () => {
+        if (!rescateActivo) return;
+        const wrap = $("#regletaWrap");
+        $("#btnBasura").disabled = true;
+        state.plugs = {}; /* se desenchufan todos los aparatos */
+        guardarYRender();
+        wrap.classList.add("tirando"); /* la regleta cae girando y desaparece */
+        setTimeout(() => {
+          wrap.style.visibility = "hidden";
+          const b2 = $("#btnComprar"); /* ahora sí se puede comprar la nueva */
+          b2.disabled = false;
+          b2.classList.remove("animada");
+          void b2.offsetWidth;
+          b2.classList.add("animada");
+        }, 1100);
+      });
+      $("#btnComprar").addEventListener("click", () => {
+        if (!rescateActivo || $("#btnComprar").disabled) return;
+        const wrap = $("#regletaWrap");
+        wrap.classList.remove("tirando");
+        wrap.style.visibility = "";
+        wrap.classList.add(
+          "nueva",
+        ); /* la regleta nueva entra cayendo del cielo */
+        state.quemada = false;
+        state.switchOn = false;
+        ocultarRescate();
+        guardarYRender();
+        setTimeout(() => wrap.classList.remove("nueva"), 1000);
+      });
+
+      /* =================== FORMULARIO NUEVO APARATO =================== */
+      let fotoData = null;
+      $("#btnAdd").addEventListener("click", () => {
+        $("#formAparato").style.display = "block";
+        $("#fNombre").focus();
+      });
+      $("#btnCancelForm").addEventListener("click", () => {
+        $("#formAparato").style.display = "none";
+      });
+      $("#fFoto").addEventListener("change", async (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        try {
+          fotoData = await procesarFoto(f);
+          const pv = $("#previewFoto");
+          pv.src = fotoData;
+          pv.style.display = "block";
+        } catch (err) {
+          msgForm("No se pudo leer la imagen.", true);
+        }
+      });
+      $("#formNuevo").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const nombre = $("#fNombre").value.trim();
+        const amps = parseFloat($("#fAmps").value.replace(",", "."));
+        const watts = parseFloat($("#fWatts").value) || 0;
+        const desc = $("#fDesc").value.trim();
+        if (!nombre || !(amps > 0)) {
+          msgForm("Nombre e intensidad son obligatorios.", true);
+          return;
+        }
+        state.appliances.push({
+          id: uid(),
+          nombre,
+          amperios: amps,
+          vatios: watts,
+          descripcion: desc,
+          imagen: fotoData,
+          builtin: false,
+        });
+        e.target.reset();
+        fotoData = null;
+        $("#previewFoto").style.display = "none";
+        msgForm("Aparato guardado.", false);
+        await guardarYRender();
+        setTimeout(() => {
+          $("#formAparato").style.display = "none";
+          msgForm("");
+        }, 900);
+      });
+      function msgForm(txt, err) {
+        const m = $("#msgForm");
+        m.textContent = txt;
+        m.className = "msg " + (err ? "err" : "ok");
+      }
+
+      /* =================== EXPORTAR / IMPORTAR ZIP =================== */
+      $("#btnExport").addEventListener("click", exportarZIP);
+      $("#btnImport").addEventListener("click", () => $("#fileImport").click());
+      $("#fileImport").addEventListener("change", importarZIP);
+
+      async function exportarZIP() {
+        if (typeof JSZip === "undefined") {
+          alert(
+            "JSZip no se ha podido cargar (¿sin conexión?). La exportación necesita la librería CDN.",
+          );
+          return;
+        }
+        const zip = new JSZip();
+        const carpeta = zip.folder("images");
+        const faltan = [];
+        const manifest = {
+          version: 1,
+          exportado: new Date().toISOString(),
+          numTomas: state.numTomas,
+          plugs: state.plugs,
+          appliances: [],
+        };
+        for (const a of state.appliances) {
+          let fichero = a.imagen;
+          if (a.imagen && !a.imagen.startsWith("data:")) {
+            const durl = await imagenADataURL(a);
+            if (durl) {
+              fichero = a.id + ".png";
+              carpeta.file(fichero, durl.split(",")[1], { base64: true });
+            } else {
+              faltan.push(
+                a.imagen,
+              ); /* se mantiene la ruta relativa en el JSON */
+            }
+          } else if (a.imagen) {
+            fichero = a.id + ".png";
+            carpeta.file(fichero, a.imagen.split(",")[1], { base64: true });
+          }
+          manifest.appliances.push({
+            id: a.id,
+            nombre: a.nombre,
+            amperios: a.amperios,
+            vatios: a.vatios,
+            descripcion: a.descripcion,
+            imagen: fichero,
+            builtin: !!a.builtin,
+          });
+        }
+        zip.file("data.json", JSON.stringify(manifest, null, 2));
+        if (faltan.length)
+          zip.file(
+            "IMAGENES_NO_INCLUIDAS.txt",
+            "No se pudieron incrustar estas imágenes (abre la página desde un servidor local para incluirlas):\n" +
+              faltan.join("\n"),
+          );
+        const blob = await zip.generateAsync({
+          type: "blob",
+          compression: "DEFLATE",
+        });
+        const enlace = document.createElement("a");
+        enlace.href = URL.createObjectURL(blob);
+        enlace.download = "regleta_datos.zip";
+        enlace.click();
+        setTimeout(() => URL.revokeObjectURL(enlace.href), 4000);
+      }
+
+      async function importarZIP(e) {
+        const f = e.target.files[0];
+        if (!f) return;
+        e.target.value = "";
+        if (typeof JSZip === "undefined") {
+          alert("JSZip no se ha podido cargar (¿sin conexión?).");
+          return;
+        }
+        try {
+          const zip = await JSZip.loadAsync(f);
+          const dataFile = zip.file("data.json");
+          if (!dataFile) throw new Error("El ZIP no contiene data.json");
+          const manifest = JSON.parse(await dataFile.async("string"));
+          const nuevos = [];
+          for (const a of manifest.appliances || []) {
+            let imagen = a.imagen || null;
+            if (imagen && !imagen.startsWith("data:")) {
+              const imgFile = zip.file("images/" + imagen.split("/").pop());
+              if (imgFile) {
+                const b64 = await imgFile.async("base64");
+                imagen = "data:image/png;base64," + b64;
+              }
+            }
+            nuevos.push({
+              id: a.id || uid(),
+              nombre: a.nombre,
+              amperios: +a.amperios || 0,
+              vatios: +a.vatios || 0,
+              descripcion: a.descripcion || "",
+              imagen,
+              builtin: !!a.builtin,
+            });
+          }
+          state.appliances = nuevos;
+          state.numTomas = Math.min(6, Math.max(2, +manifest.numTomas || 4));
+          state.plugs = {};
+          state.switchOn = false;
+          state.quemada = false;
+          Object.entries(manifest.plugs || {}).forEach(([k, v]) => {
+            if (+k < state.numTomas && aparatoPorId(v)) state.plugs[k] = v;
+          });
+          $("#selTomas").value = state.numTomas;
+          detenerFuego();
+          await guardarYRender();
+          aviso("Datos importados correctamente desde " + f.name);
+        } catch (err) {
+          alert("Error al importar: " + err.message);
         }
       }
-      nuevos.push({ id:a.id || uid(), nombre:a.nombre, amperios:+a.amperios||0, vatios:+a.vatios||0,
-        descripcion:a.descripcion||"", imagen, builtin:!!a.builtin });
-    }
-    state.appliances = nuevos;
-    state.numTomas = Math.min(6, Math.max(2, +manifest.numTomas || 4));
-    state.plugs = {}; state.switchOn = false; state.quemada = false;
-    Object.entries(manifest.plugs || {}).forEach(([k,v])=>{ if(+k < state.numTomas && aparatoPorId(v)) state.plugs[k]=v; });
-    $("#selTomas").value = state.numTomas;
-    detenerFuego();
-    await guardarYRender();
-    aviso("Datos importados correctamente desde " + f.name);
-  }catch(err){
-    alert("Error al importar: " + err.message);
-  }
-}
 
-/* =================== ARRANQUE =================== */
-window.addEventListener("resize", dibujarCables);
-(async function iniciar(){
-  try{
-    const guardado = await DB.cargar("state");
-    if(guardado && Array.isArray(guardado.appliances) && guardado.appliances.length){
-      state = guardado;
-      state.switchOn = false; state.quemada = false;
-      $("#selTomas").value = state.numTomas;
-      /* incorporar aparatos predefinidos nuevos que no estén ya guardados */
-      const ids = new Set(state.appliances.map(a=>a.id));
-      PREDEFINIDOS.forEach(a=>{ if(!ids.has(a.id)) state.appliances.push(a); });
-    }
-  }catch(e){}
-  renderTodo();
-})();
-</script>
-</body>
+      /* =================== ARRANQUE =================== */
+      window.addEventListener("resize", dibujarCables);
+      (async function iniciar() {
+        try {
+          const guardado = await DB.cargar("state");
+          if (
+            guardado &&
+            Array.isArray(guardado.appliances) &&
+            guardado.appliances.length
+          ) {
+            state = guardado;
+            state.switchOn = false;
+            state.quemada = false;
+            $("#selTomas").value = state.numTomas;
+            /* incorporar aparatos predefinidos nuevos que no estén ya guardados */
+            const ids = new Set(state.appliances.map((a) => a.id));
+            PREDEFINIDOS.forEach((a) => {
+              if (!ids.has(a.id)) state.appliances.push(a);
+            });
+          }
+        } catch (e) {}
+        renderTodo();
+      })();
+    </script>
+  </body>
 </html>
